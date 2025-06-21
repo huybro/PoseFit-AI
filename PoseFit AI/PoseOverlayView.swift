@@ -2,7 +2,7 @@ import SwiftUI
 import Vision
 
 struct PoseOverlayView: View {
-    let poses: [VNHumanBodyPoseObservation]
+    let poses: [VNHumanBodyPose3DObservation]
     let frameSize: CGSize
     
     var body: some View {
@@ -14,24 +14,36 @@ struct PoseOverlayView: View {
         .allowsHitTesting(false) // Let touches pass through
     }
     
-    private func drawPose(pose: VNHumanBodyPoseObservation, context: GraphicsContext, size: CGSize) {
-        // First, collect all joint positions
-        var jointPositions: [VNHumanBodyPoseObservation.JointName: CGPoint] = [:]
+    private func drawPose(pose: VNHumanBodyPose3DObservation, context: GraphicsContext, size: CGSize) {
+        // First, collect all joint positions from 3D pose
+        var jointPositions: [VNHumanBodyPose3DObservation.JointName: CGPoint] = [:]
         
-        let jointNames: [VNHumanBodyPoseObservation.JointName] = [
+        let jointNames: [VNHumanBodyPose3DObservation.JointName] = [
             .leftShoulder, .rightShoulder, .leftElbow, .rightElbow,
             .leftWrist, .rightWrist, .leftHip, .rightHip,
             .leftKnee, .rightKnee, .leftAnkle, .rightAnkle
         ]
         
-        // Collect valid joint positions
+        // Collect valid joint positions from 3D poses
         for jointName in jointNames {
-            if let point = try? pose.recognizedPoint(jointName), point.confidence > 0.3 {
-                let position = CGPoint(
-                    x: (1 - point.location.y) * size.width,
-                    y: point.location.x * size.height
-                )
-                jointPositions[jointName] = position
+            if pose.availableJointNames.contains(jointName),
+               let point3D = try? pose.recognizedPoint(jointName) {
+                // Use Apple's recommended method to project 3D to 2D
+                if let imagePoint = try? pose.pointInImage(jointName) {
+                    // Convert from normalized coordinates to view coordinates
+                    let position = CGPoint(
+                        x: imagePoint.x * size.width,
+                        y: (1.0 - imagePoint.y) * size.height  // Flip Y for iOS
+                    )
+                    jointPositions[jointName] = position
+                } else {
+                    // Fallback: manual projection (if pointInImage fails)
+                    let position = CGPoint(
+                        x: CGFloat(0.5 + point3D.position.columns.3.x * 0.5) * size.width,
+                        y: CGFloat(0.5 - point3D.position.columns.3.y * 0.5) * size.height
+                    )
+                    jointPositions[jointName] = position
+                }
             }
         }
         
@@ -47,9 +59,9 @@ struct PoseOverlayView: View {
         }
     }
     
-    private func drawSkeleton(jointPositions: [VNHumanBodyPoseObservation.JointName: CGPoint], context: GraphicsContext) {
+    private func drawSkeleton(jointPositions: [VNHumanBodyPose3DObservation.JointName: CGPoint], context: GraphicsContext) {
         // Define skeleton connections
-        let connections: [(VNHumanBodyPoseObservation.JointName, VNHumanBodyPoseObservation.JointName)] = [
+        let connections: [(VNHumanBodyPose3DObservation.JointName, VNHumanBodyPose3DObservation.JointName)] = [
             // Arms
             (.leftShoulder, .leftElbow), (.leftElbow, .leftWrist),
             (.rightShoulder, .rightElbow), (.rightElbow, .rightWrist),

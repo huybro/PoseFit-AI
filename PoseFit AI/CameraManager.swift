@@ -6,8 +6,8 @@ class CameraManager: NSObject, ObservableObject {
     private let captureSession = AVCaptureSession()
     
     // Add these for pose detection
-    private var poseRequest: VNDetectHumanBodyPoseRequest?
-    @Published var detectedPoses: [VNHumanBodyPoseObservation] = []
+    private var poseRequest: VNDetectHumanBodyPose3DRequest?
+    @Published var detectedPoses: [VNHumanBodyPose3DObservation] = []
     @Published var currentAnalysis: WorkoutAnalysis? = nil
     @Published var stableFeedback: WorkoutAnalysis? = nil
     
@@ -70,15 +70,17 @@ class CameraManager: NSObject, ObservableObject {
     }
     
     private func setupPoseDetection() {
-        poseRequest = VNDetectHumanBodyPoseRequest { [weak self] request, error in
-            guard let results = request.results as? [VNHumanBodyPoseObservation],
-                  let firstPose = results.first else { return }
+        poseRequest = VNDetectHumanBodyPose3DRequest { [weak self] request, error in
+            guard let results = request.results as? [VNHumanBodyPose3DObservation],
+                  let firstPose = results.first else { 
+                print("❌ No 3D poses detected")
+                return 
+            }
             
             DispatchQueue.main.async {
                 self?.detectedPoses = results
-                
-                // Add real-time analysis
-                self?.analyzeCurrentPose(firstPose)
+                print("🎯 Detected 3D pose with \(firstPose.availableJointNames.count) joints")
+                self?.analyzeCurrentPose3D(firstPose)
             }
         }
     }
@@ -89,6 +91,27 @@ class CameraManager: NSObject, ObservableObject {
         switch currentWorkoutType {
         case .squat:
             analysis = PoseAnalyzer.analyzeSquat(pose: pose)
+        case .pushUp:
+            analysis = nil
+        case .plank:
+            analysis = nil
+        }
+        
+        if let newAnalysis = analysis {
+            currentAnalysis = newAnalysis
+            
+            // Update stable feedback and reset timer
+            stableFeedback = newAnalysis
+            resetFeedbackTimer()
+        }
+    }
+    
+    private func analyzeCurrentPose3D(_ pose: VNHumanBodyPose3DObservation) {
+        let analysis: WorkoutAnalysis?
+        
+        switch currentWorkoutType {
+        case .squat:
+            analysis = PoseAnalyzer.analyzeSquat3D(pose: pose)
         case .pushUp:
             analysis = nil
         case .plank:

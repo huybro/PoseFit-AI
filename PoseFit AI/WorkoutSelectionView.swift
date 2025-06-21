@@ -3,7 +3,7 @@ import SwiftUI
 struct WorkoutSelectionView: View {
     @Binding var isPresented: Bool
     @State private var selectedWorkout: WorkoutType? = nil
-    @State private var showWorkoutView = false
+    @State private var showVideoUploadView = false
     
     var body: some View {
         NavigationView {
@@ -43,8 +43,8 @@ struct WorkoutSelectionView: View {
                 
                 // Start Button
                 if let workout = selectedWorkout {
-                    Button("Start \(workout.displayName)") {
-                        showWorkoutView = true
+                    Button("Analyze \(workout.displayName)") {
+                        showVideoUploadView = true
                     }
                     .font(.title2)
                     .fontWeight(.semibold)
@@ -60,9 +60,9 @@ struct WorkoutSelectionView: View {
             .background(Color.black)
             .navigationBarHidden(true)
         }
-        .fullScreenCover(isPresented: $showWorkoutView) {
+        .fullScreenCover(isPresented: $showVideoUploadView) {
             if let workout = selectedWorkout {
-                WorkoutView(isPresented: $showWorkoutView, workoutType: workout)
+                VideoUploadView(isPresented: $showVideoUploadView, workoutType: workout)
             }
         }
     }
